@@ -1,3 +1,48 @@
 @use "./base.scss";
 
 // put your custom CSS here!
+.page {
+
+& article{
+
+p {
+  font-size: 1.2rem;
+  word-spacing: 1px;
+  // letter-spacing: 1px;
+}
+
+li {
+    font-size: 1.1rem;
+}
+}}
+
+.section-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 2rem;
+  padding: 2rem 0;
+}
+
+.section-tile {
+  text-decoration: none;
+  padding: 1.5rem;
+  border-radius: 12px;
+  background-color: #f5f5f5;
+  transition: transform 0.2s, background-color 0.2s;
+}
+
+.section-tile:hover {
+  transform: translateY(-5px);
+  background-color: #e0f7fa;
+}
+
+.section-tile h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.2rem;
+}
+
+.section-tile p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #555;
+}
