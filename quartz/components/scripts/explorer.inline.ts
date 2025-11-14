@@ -175,7 +175,7 @@ async function setupExplorer(currentSlug: FullSlug) {
     const data = await fetchData
     const entries = [...Object.entries(data)] as [FullSlug, ContentDetails][]
     const trie = FileTrieNode.fromEntries(entries)
-
+console.log("Sample node:", trie.children[0])
     // Apply functions in order
     for (const fn of opts.order) {
       switch (fn) {

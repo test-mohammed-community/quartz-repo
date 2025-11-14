@@ -3,7 +3,6 @@ import { QuartzPluginData } from "../vfile"
 import path from "path"
 import fs from "fs"
 import yaml from "js-yaml"
-// import { BuildCtx } from "../ctx"
 
 interface OrderingStructure {
   order?: OrderItem[]
@@ -26,28 +25,19 @@ interface FileOrderingData {
   explicitOrder: boolean
 }
 
+let orderingData: OrderingStructure | null = null
+let orderingMap: Map<string, FileOrderingData> = new Map()
+
 export const ApplyOrdering: QuartzTransformerPlugin<OrderingConfig> = (userOpts) => {
   const opts = { orderingFile: "_ordering.yaml", ...userOpts }
-  
-  let orderingData: OrderingStructure | null = null
-  let orderingMap: Map<string, FileOrderingData> = new Map()
 
   return {
     name: "ApplyOrdering",
-    markdownPlugins() {
-      return []
-    },
-    htmlPlugins() {
-      return []
-    },
-    externalResources() {
-      return {}
-    },
-   async markup(_ctx: any, data: QuartzPluginData)  { 
-      // Load ordering file once on first run
+    textTransform(ctx, src) {
+      // Load ordering file once on first file
       if (orderingData === null) {
         try {
-          const orderingPath = path.join(_ctx.argv.directory, opts.orderingFile!)
+          const orderingPath = path.join(ctx.argv.directory, opts.orderingFile!)
           
           if (fs.existsSync(orderingPath)) {
             const fileContent = fs.readFileSync(orderingPath, "utf8")
@@ -66,32 +56,43 @@ export const ApplyOrdering: QuartzTransformerPlugin<OrderingConfig> = (userOpts)
           orderingData = {}
         }
       }
-
-      // Apply ordering data to this file
-      if (data.slug && orderingMap.size > 0) {
-        const filePath = data.slug
-        const orderingInfo = findOrderingForPath(filePath, orderingMap)
-        
-        if (orderingInfo) {
-          // Add ordering metadata to frontmatter
-          if (!data.frontmatter) {
-            data.frontmatter = {}
+      
+      return src
+    },
+    markdownPlugins() {
+      return [
+        () => {
+          return (tree, file) => {
+            const data = file.data as QuartzPluginData
+            
+            if (data.slug && orderingMap.size > 0) {
+              const orderingInfo = findOrderingForPath(data.slug, orderingMap)
+              
+              if (orderingInfo) {
+                if (!data.frontmatter) {
+                  data.frontmatter = {} as any
+                }
+                const fm = data.frontmatter as any
+                fm._weight = orderingInfo.weight
+                fm._folderWeight = orderingInfo.folderWeight
+                fm._explicitOrder = orderingInfo.explicitOrder
+                
+                console.log(`✓ Applied to ${data.slug}: weight=${orderingInfo.weight}`)
+              }
+            }
           }
-          
-          data.frontmatter._weight = orderingInfo.weight
-          data.frontmatter._folderWeight = orderingInfo.folderWeight
-          data.frontmatter._explicitOrder = orderingInfo.explicitOrder
         }
-      }
-
-      return data
+      ]
+    },
+    htmlPlugins() {
+      return []
+    },
+    externalResources() {
+      return {}
     }
   }
 }
 
-/**
- * Build a map of file paths to their ordering information
- */
 function buildOrderingMap(orderingData: OrderingStructure): Map<string, FileOrderingData> {
   const map = new Map<string, FileOrderingData>()
   const folderWeights = orderingData.folder_weights || {}
@@ -107,7 +108,6 @@ function buildOrderingMap(orderingData: OrderingStructure): Map<string, FileOrde
 
     for (const item of items) {
       if (item.file) {
-        // Handle file
         const filePath = path.join(currentPath, item.file).replace(/\\/g, "/")
         const normalizedPath = normalizeFilePath(filePath)
         
@@ -117,26 +117,37 @@ function buildOrderingMap(orderingData: OrderingStructure): Map<string, FileOrde
           explicitOrder: true
         })
         
-        weight += 10 // Increment by 10 to allow for insertions
+        weight += 10
       } else if (item.folder) {
-        // Handle folder
         const folderPath = path.join(currentPath, item.folder).replace(/\\/g, "/")
         const folderWeight = folderWeights[item.folder] || folderWeights[folderPath] || 999
+        console.log(`  Folder: ${item.folder}, folderWeight: ${folderWeight}`)
+        // Store folder README (not index!)
+        const folderReadmePath = normalizeFilePath(path.join(folderPath, "README.md"))
+        map.set(folderReadmePath, {
+          weight: weight,
+          folderWeight: folderWeight,
+          explicitOrder: true
+        })
+        
+        console.log(`  Mapped: ${folderReadmePath}`)
+        
+        weight += 10
         
         // Process items within this folder
-        if (item.order) {
+        if (item.order && item.order.length > 0) {
           processItems(item.order, folderPath, 0)
-        }
-        
-        // Store folder metadata (for index files)
-        const folderIndexPath = normalizeFilePath(path.join(folderPath, "index.md"))
-        if (!map.has(folderIndexPath)) {
-          map.set(folderIndexPath, {
-            weight: 0,
-            folderWeight: folderWeight,
-            explicitOrder: true
-          })
-        }
+        }} else if (item.folder) {
+  const folderPath = path.join(currentPath, item.folder).replace(/\\/g, "/")
+  const folderWeight = folderWeights[item.folder] || folderWeights[folderPath] || 999
+  
+  // Store folder README
+  const folderReadmePath = normalizeFilePath(path.join(folderPath, "README.md"))
+  map.set(folderReadmePath, {
+    weight: weight,
+    folderWeight: folderWeight,  // Use the weight from folder_weights
+    explicitOrder: true
+  })
       }
     }
 
@@ -146,19 +157,13 @@ function buildOrderingMap(orderingData: OrderingStructure): Map<string, FileOrde
   processItems(orderingData.order)
   return map
 }
-
-/**
- * Normalize file path (remove .md extension, handle index files)
- */
 function normalizeFilePath(filePath: string): string {
   let normalized = filePath.replace(/\\/g, "/")
   
-  // Remove leading slash
   if (normalized.startsWith("/")) {
     normalized = normalized.slice(1)
   }
   
-  // Remove .md extension if present
   if (normalized.endsWith(".md")) {
     normalized = normalized.slice(0, -3)
   }
@@ -166,42 +171,43 @@ function normalizeFilePath(filePath: string): string {
   return normalized
 }
 
-/**
- * Find ordering information for a given file path
- */
 function findOrderingForPath(
   slugPath: string,
   orderingMap: Map<string, FileOrderingData>
 ): FileOrderingData | null {
-  // Try exact match
   const normalized = normalizeFilePath(slugPath)
   
+  console.log(`  Looking for: "${normalized}"`)
+  
   if (orderingMap.has(normalized)) {
+    console.log(`    Found exact match!`)
     return orderingMap.get(normalized)!
   }
   
-  // Try with index
   const withIndex = path.join(normalized, "index").replace(/\\/g, "/")
+  console.log(`  Trying with index: "${withIndex}"`)
   if (orderingMap.has(withIndex)) {
+    console.log(`    Found with index!`)
     return orderingMap.get(withIndex)!
   }
   
-  // Try parent folder
   const parts = normalized.split("/")
   if (parts.length > 1) {
     const parentPath = parts.slice(0, -1).join("/")
+    console.log(`  Trying parent: "${parentPath}"`)
     if (orderingMap.has(parentPath)) {
+      console.log(`    Found parent!`)
       const parentData = orderingMap.get(parentPath)!
       return {
-        weight: 999, // Not explicitly ordered, so put at end
+        weight: 999,
         folderWeight: parentData.folderWeight,
         explicitOrder: false
       }
     }
   }
   
+  console.log(`    Not found`)
   return null
 }
 
-// Export default for Quartz compatibility
 export default ApplyOrdering

@@ -1,6 +1,6 @@
 import { QuartzConfig } from "./quartz/cfg"
 import * as Plugin from "./quartz/plugins"
-
+import { ApplyOrdering } from "./quartz/plugins/transformers/orderFromYAML"
 /**
  * Quartz 4 Configuration
  *
@@ -56,6 +56,7 @@ darkMode: {
   plugins: {
     transformers: [
       Plugin.FrontMatter(),
+      ApplyOrdering(),
       Plugin.CreatedModifiedDate({
         priority: ["frontmatter", "git", "filesystem"],
       }),

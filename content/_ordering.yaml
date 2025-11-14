@@ -1,0 +1,52 @@
+order:
+  - file: "index.md"
+  
+  - folder: "How-to-install"
+
+  - folder: "Linux-Basics"
+    order:  
+      - folder: "Introduction-to-Linux"
+      - folder: "FOSS"
+      - folder: "Linux-Desktop"
+      - folder: "Boot-Process"
+      - folder: "CLI--and--Linux-File-System"
+      - folder: "Simple-Commands"
+      - folder: "Viewing-Files"
+      - folder: "File-Globbing"
+      - folder: "Creating-Links"
+      - folder: "Files-Permissions--and--Ownership"
+      - folder: "Dealing-with-Users--and--Groups"
+      - folder: "Environment--and--Startup-Files"
+      - folder: "Finding-Files"
+      - folder: "Compression-and-Archiving"
+      - folder: "Redirecting-Output"
+      - folder: "Processes"
+      - folder: "Text-Processing"
+      - folder: "Shell-Scripting"
+      - file: "README"
+      
+  - folder: "Linux-advanced-topics"
+    order:
+      - folde:: "Editors"
+      - folder: "Job-Scheduling"
+      - folder: "Networking"
+      - folder: "Package-Managers"
+
+  - folder: "Git--and--githuhb"
+  
+  - folder: "DevOps"
+  
+  - folder: "Tools"
+  
+  - folder: "Common-issues--and--its-fixes"
+  - file: "contrbuite.md"
+  - file: "manifesto.md"
+
+folder_weights:
+  "How-to-install": 1
+  "Linux-Basics": 2
+  "Linux-advanced-topics": 3
+  "Git--and--githuhb": 4
+  "DevOps": 5
+  "Tools": 7
+  "Common-issues--and--its-fixes": 6

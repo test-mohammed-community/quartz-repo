@@ -19,8 +19,8 @@ export type ContentDetails = {
   richContent?: string
   date?: Date
   description?: string
+  frontmatter?: Record<string, any>  // Add this line
 }
-
 interface Options {
   enableSiteMap: boolean
   enableRSS: boolean
@@ -103,19 +103,20 @@ export const ContentIndex: QuartzEmitterPlugin<Partial<Options>> = (opts) => {
         const slug = file.data.slug!
         const date = getDate(ctx.cfg.configuration, file.data) ?? new Date()
         if (opts?.includeEmptyFiles || (file.data.text && file.data.text !== "")) {
-          linkIndex.set(slug, {
-            slug,
-            filePath: file.data.relativePath!,
-            title: file.data.frontmatter?.title!,
-            links: file.data.links ?? [],
-            tags: file.data.frontmatter?.tags ?? [],
-            content: file.data.text ?? "",
-            richContent: opts?.rssFullHtml
-              ? escapeHTML(toHtml(tree as Root, { allowDangerousHtml: true }))
-              : undefined,
-            date: date,
-            description: file.data.description ?? "",
-          })
+linkIndex.set(slug, {
+  slug,
+  filePath: file.data.relativePath!,
+  title: file.data.frontmatter?.title!,
+  links: file.data.links ?? [],
+  tags: file.data.frontmatter?.tags ?? [],
+  content: file.data.text ?? "",
+  richContent: opts?.rssFullHtml
+    ? escapeHTML(toHtml(tree as Root, { allowDangerousHtml: true }))
+    : undefined,
+  date: date,
+  description: file.data.description ?? "",
+  frontmatter: file.data.frontmatter,  // Add this line
+})
         }
       }
 
