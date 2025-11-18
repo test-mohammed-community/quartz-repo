@@ -77,7 +77,7 @@ export const ApplyOrdering: QuartzTransformerPlugin<OrderingConfig> = (userOpts)
                 fm._folderWeight = orderingInfo.folderWeight
                 fm._explicitOrder = orderingInfo.explicitOrder
                 
-                console.log(`✓ Applied to ${data.slug}: weight=${orderingInfo.weight}`)
+                console.log(`✓ Applied to ${data.slug}: weight=${orderingInfo.weight}, folderWeight=${orderingInfo.folderWeight}`)
               }
             }
           }
@@ -111,43 +111,39 @@ function buildOrderingMap(orderingData: OrderingStructure): Map<string, FileOrde
         const filePath = path.join(currentPath, item.file).replace(/\\/g, "/")
         const normalizedPath = normalizeFilePath(filePath)
         
+        // Get folder weight for the current path
+        const parentFolderWeight = getFolderWeight(currentPath, folderWeights)
+        
         map.set(normalizedPath, {
           weight: weight,
-          folderWeight: folderWeights[currentPath] || 999,
+          folderWeight: parentFolderWeight,
           explicitOrder: true
         })
         
+        console.log(`  File: ${normalizedPath}, weight: ${weight}, folderWeight: ${parentFolderWeight}`)
         weight += 10
       } else if (item.folder) {
         const folderPath = path.join(currentPath, item.folder).replace(/\\/g, "/")
-        const folderWeight = folderWeights[item.folder] || folderWeights[folderPath] || 999
-        console.log(`  Folder: ${item.folder}, folderWeight: ${folderWeight}`)
-        // Store folder README (not index!)
-        const folderReadmePath = normalizeFilePath(path.join(folderPath, "README.md"))
+        
+        // Get the folder weight - check both the folder name alone and the full path
+        const folderWeight = getFolderWeight(folderPath, folderWeights)
+        
+        // Store folder README
+        const folderReadmePath = normalizeFilePath(path.join(folderPath, "README"))
         map.set(folderReadmePath, {
           weight: weight,
           folderWeight: folderWeight,
           explicitOrder: true
         })
         
-        console.log(`  Mapped: ${folderReadmePath}`)
+        console.log(`  Folder: ${item.folder}, folderReadme: ${folderReadmePath}, weight: ${weight}, folderWeight: ${folderWeight}`)
         
         weight += 10
         
         // Process items within this folder
         if (item.order && item.order.length > 0) {
           processItems(item.order, folderPath, 0)
-        }} else if (item.folder) {
-  const folderPath = path.join(currentPath, item.folder).replace(/\\/g, "/")
-  const folderWeight = folderWeights[item.folder] || folderWeights[folderPath] || 999
-  
-  // Store folder README
-  const folderReadmePath = normalizeFilePath(path.join(folderPath, "README.md"))
-  map.set(folderReadmePath, {
-    weight: weight,
-    folderWeight: folderWeight,  // Use the weight from folder_weights
-    explicitOrder: true
-  })
+        }
       }
     }
 
@@ -157,6 +153,35 @@ function buildOrderingMap(orderingData: OrderingStructure): Map<string, FileOrde
   processItems(orderingData.order)
   return map
 }
+
+// Helper function to get folder weight with proper fallback
+function getFolderWeight(folderPath: string, folderWeights: Record<string, number>): number {
+  // Remove leading slash if present
+  const cleanPath = folderPath.startsWith("/") ? folderPath.slice(1) : folderPath
+  
+  // Try exact match first
+  if (folderWeights[cleanPath] !== undefined) {
+    return folderWeights[cleanPath]
+  }
+  
+  // Try just the folder name (last segment)
+  const folderName = cleanPath.split("/").pop() || ""
+  if (folderWeights[folderName] !== undefined) {
+    return folderWeights[folderName]
+  }
+  
+  // Check parent folders
+  const parts = cleanPath.split("/")
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const partialPath = parts.slice(0, i + 1).join("/")
+    if (folderWeights[partialPath] !== undefined) {
+      return folderWeights[partialPath]
+    }
+  }
+  
+  return 999
+}
+
 function normalizeFilePath(filePath: string): string {
   let normalized = filePath.replace(/\\/g, "/")
   
@@ -179,25 +204,35 @@ function findOrderingForPath(
   
   console.log(`  Looking for: "${normalized}"`)
   
+  // Exact match
   if (orderingMap.has(normalized)) {
     console.log(`    Found exact match!`)
     return orderingMap.get(normalized)!
   }
   
+  // Try with index
   const withIndex = path.join(normalized, "index").replace(/\\/g, "/")
-  console.log(`  Trying with index: "${withIndex}"`)
   if (orderingMap.has(withIndex)) {
     console.log(`    Found with index!`)
     return orderingMap.get(withIndex)!
   }
   
+  // Try with README
+  const withReadme = path.join(normalized, "README").replace(/\\/g, "/")
+  if (orderingMap.has(withReadme)) {
+    console.log(`    Found with README!`)
+    return orderingMap.get(withReadme)!
+  }
+  
+  // Check parent folder
   const parts = normalized.split("/")
   if (parts.length > 1) {
     const parentPath = parts.slice(0, -1).join("/")
-    console.log(`  Trying parent: "${parentPath}"`)
-    if (orderingMap.has(parentPath)) {
-      console.log(`    Found parent!`)
-      const parentData = orderingMap.get(parentPath)!
+    const parentReadme = path.join(parentPath, "README").replace(/\\/g, "/")
+    
+    if (orderingMap.has(parentReadme)) {
+      console.log(`    Found parent README: ${parentReadme}`)
+      const parentData = orderingMap.get(parentReadme)!
       return {
         weight: 999,
         folderWeight: parentData.folderWeight,
