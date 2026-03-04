@@ -18,9 +18,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+    
       - name: Checkout Quartz Engine
         uses: actions/checkout@v4
 
+      - name: Clean default content
+        run: rm -rf content/*
       - name: Checkout Content from Repo A
         uses: actions/checkout@v4
         with:
