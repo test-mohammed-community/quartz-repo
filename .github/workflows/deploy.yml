@@ -1,0 +1,60 @@
+name: Deploy Quartz Site
+
+on:
+  repository_dispatch:
+    types: [content_updated]
+  workflow_dispatch: # Allows you to click "Run Workflow" manually for testing
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Quartz Engine
+        uses: actions/checkout@v4
+
+      - name: Checkout Content from Repo A
+        uses: actions/checkout@v4
+        with:
+          # Replace with your actual Org and Content Repo names
+          repository:     test-mohammed-community/content-repo
+          token: ${{ secrets.ORG_LINUX_WIKI }}
+          # This ensures the files go exactly where Quartz expects them
+          path: content 
+          # Use 'false' to get the full history or 'true' for just the latest
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Quartz
+        run: npx quartz build
+
+      - name: Upload Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
